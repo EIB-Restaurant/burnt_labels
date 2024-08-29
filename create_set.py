@@ -4,6 +4,107 @@ import pandas as pd
 import numpy as np
 
 
+class prob_object():
+    def __init__(self, probs, labels, unq_arr, namedic, depth = [0]):
+        self.ndic = namedic
+        self.olabs = list(namedic.keys())
+        self.depth = depth
+        probs = probs / probs.sum(axis=1, keepdims=True)
+        print(depth, probs.shape, labels.shape, unq_arr.shape)
+        self.probs = probs
+        self.labels = labels
+        self.unq_arr = unq_arr
+        self.lev_labels = self.labels[:, 0]
+        self.lev_unq = np.arange(0,self.lev_labels.max()+1)
+        # self.lev_unq = np.unique(self.lev_labels)
+
+        self.lev_list = self._create_lev()
+        self.lev_probs = self.ret_sum_prob()
+        self.lev_preds = self.lev_probs.argmax(axis=1)
+        self.lev_nums = [np.sum(self.lev_labels == u) for u in self.lev_unq]
+        self.labs = [f'{n}-{lb}' for n, lb in zip(self.lev_nums, self.olabs)]
+        self.sel_lev = [np.where((self.lev_labels == u) & (self.lev_preds == u))[0] for u in self.lev_unq]
+
+        print(depth, len(self.labels), len(self.lev_list), [len(lev) for lev in self.lev_list], [len(lev) for lev in self.sel_lev], self.unq_arr.shape)
+        self.children = []
+        if len(self.lev_list) > 1 and self.unq_arr.shape[1] > 1:
+            for ilev in range(len(self.lev_list)):
+                if len(self.sel_lev[ilev]) > 0 and len(self.lev_list[ilev]) > 1:
+                    self.children.append(prob_object(self.probs[self.sel_lev[ilev]][:,self.lev_list[ilev]], self.labels[self.sel_lev[ilev], 1:],
+                                                  self.unq_arr[self.lev_list[ilev],1:], self.ndic[self.olabs[ilev]], depth=[*depth, ilev]))
+
+
+    def _create_lev(self):
+        msks = [(self.unq_arr[:,0] == u) for u in self.lev_unq]
+        return [np.where(m)[0] for m in msks]
+    
+    def ret_sum_prob(self):
+        return np.array([self.probs[:,lev].sum(axis=1) for lev in self.lev_list]).T
+    
+    def get_children(self):
+        if len(self.children)>0:
+            return self.children
+        else:
+            return None
+        
+    def plot_probs(self, figax = None, conf = '', color = 'cividis', norm = 'true', prec = '.2f'):
+        lss = ['-', '--', '-.', ':']
+        def text_up(x):
+            x.set_text(x.get_text().split('-')[1])
+            return x
+
+        if figax is None:
+            fig, ax = plt.subplots(figsize=(5,5))
+        else:
+            fig, ax = figax
+        key = '-'.join(map(str,self.depth))
+        if conf == 'mat':
+            cm = confusion_matrix(self.lev_labels, self.lev_preds, labels=range(len(self.labs)), normalize=norm)
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=self.labs)
+            disp.plot(ax=ax, cmap=color, xticks_rotation=85, values_format=prec, colorbar=False, text_kw = {'fontsize': 10}) 
+            # ax.set_xticklabels(ax.get_xticklabels(), fontsize=10)
+            ax.set_xticklabels(map(text_up, ax.get_xticklabels()), fontsize=10)
+            ax.set_yticklabels(ax.get_yticklabels(), fontsize=10)
+        elif conf == 'prob':
+            lab_arr = np.full_like(self.lev_probs, 0, dtype = int)
+            lab_arr[np.arange(lab_arr.shape[0]),self.lev_labels] = 1
+            for i in range(lab_arr.shape[1]):
+                fpr, tpr, _ = roc_curve(lab_arr[:,i], self.lev_probs[:,i])
+                ax.plot(fpr, tpr, label = self.labs[i], lw = 1.5+i/4, ls = lss[i%4], alpha = .05+.95**(i+1))
+                # ax.plot(fpr, tpr, label = self.labs[i].split('-')[1], lw = 2)
+            ax.plot([0,1], [0,1], 'k--', lw = 2)
+            ax.legend(fontsize = 15)
+            ax.set_xlim([-.05,1.05])
+            ax.set_ylim([-.05,1.05])
+            ax.set_xlabel('False Positive Rate', fontsize = 15)
+            ax.set_ylabel('True Positive Rate', fontsize = 15)
+            ax.tick_params(axis = 'both', direction = 'in', length = 7, which = 'major', width = 1.5)
+
+        else:
+            ax.plot(self.lev_preds, self.lev_labels, 'o', fillstyle='none', alpha = .1)
+        ax.set_title(key)
+        return {key: [fig, ax]}
+    
+    # def plot_roc(self, figax = None, conf = False, color = 'cividis', norm = 'true', prec = '.2f'):
+
+    
+    def plot_children(self, stop = 1, conf = '', color = 'cividis', norm = 'true', pself = False, prec = '.2f'):
+        if pself:
+            pl_dict = self.plot_probs(conf = conf, color = color, norm = norm, prec=prec)
+        else:
+            pl_dict = {}
+        lch = len(self.children)
+        if lch>0 and stop > 0:
+            fig, axs = plt.subplots(1, lch, figsize=(7*lch, 5))
+            for ich, child in enumerate(self.children):
+                if lch > 1:
+                    pl_dict.update(child.plot_probs([fig, axs[ich]], conf = conf, color = color, norm = norm, prec = prec))
+                else:
+                    pl_dict.update(child.plot_probs([fig, axs], conf = conf, color = color, norm = norm, prec = prec))
+
+                pl_dict.update(child.plot_children(stop = stop - 1, conf = conf, color = color, norm = norm, prec = prec))
+        return pl_dict
+        
 
 
 class create_dataset():
