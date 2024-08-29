@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 
 
+
+
 class create_dataset():
     def __init__(self, df, rs = 1):
         self.df = df
@@ -42,7 +44,7 @@ class create_dataset():
 
 
 class create_number_labs():
-    def __init__(self, labs, col, base = None) -> None:
+    def __init__(self, labs, col, base = None, base_lab = True) -> None:
         self.df = labs
         self._name_dict = create_number_labs.get_num_dic(self.df[col])
         self._num_dict = create_number_labs.get_depth(self._name_dict)
@@ -51,11 +53,23 @@ class create_number_labs():
         self._max_level = np.max(self.label_array)
         if base is None:
             base = self._max_level
-        self.base_rep = list(map(lambda x:create_number_labs.baseToNumber(x, base), self.label_array))
+
         for i in range(self._depth):
             self.df[f'lab_{i}'] = self.label_array[:,i]
 
-        self.df['base_label'] = self.base_rep
+        self.df.sort_values([f'lab_{i}' for i in range(self._depth)], inplace=True)
+
+
+        if base_lab:
+            self.base_rep = list(map(lambda x:create_number_labs.baseToNumber(x, base), self.label_array))
+            self.df['base_label'] = self.base_rep
+        else:
+            self.u, indices = np.unique(self.label_array, return_inverse=True, axis = 0)
+            self.labs_nums = np.arange(len(self.u))
+            self.df['base_label'] = self.labs_nums[indices]
+
+
+
 
 
     @staticmethod
