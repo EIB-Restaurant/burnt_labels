@@ -1,4 +1,9 @@
 # burnt_labels
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8898e562-0507-457b-b9d6-180879cd1785" width="500">
+</p>
+
 ## Executive Summary
 ### Project Overview
 This project leverages Large Language Models (LLMs) to enhance product categorization for efficient inventory management in the restaurant industry. Focusing on automating back-of-house operations, the project addresses the challenge of standardizing product descriptions from multiple suppliers, which is crucial for efficient inventory management which leads to minimizing waste and increasing profits.
